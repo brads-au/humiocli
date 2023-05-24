@@ -127,6 +127,7 @@ Common Management Commands:
 	rootCmd.AddCommand(newFilesCmd())
 	rootCmd.AddCommand(newFeatureFlagsCmd())
 	rootCmd.AddCommand(newSavedQueriesCmd())
+	rootCmd.AddCommand(newRolesCmd())
 
 	// Hidden Commands
 	rootCmd.AddCommand(newWelcomeCmd())
