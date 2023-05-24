@@ -1,6 +1,7 @@
 package api
 
 import (
+	"fmt"
 	"sort"
 	"strings"
 
@@ -25,12 +26,16 @@ type ViewQueryData struct {
 			Filter     string
 		}
 	} `graphql:"... on View"`
+	AutomaticSearch bool
+	DefaultQuery    SavedQuery
 }
 
 type View struct {
-	Name        string
-	Description string
-	Connections []ViewConnection
+	Name            string
+	Description     string
+	Connections     []ViewConnection
+	AutomaticSearch bool
+	DefaultQuery    SavedQuery
 }
 
 func (c *Client) Views() *Views { return &Views{client: c} }
@@ -58,9 +63,11 @@ func (c *Views) Get(name string) (*View, error) {
 	}
 
 	view := View{
-		Name:        query.Result.Name,
-		Description: query.Result.Description,
-		Connections: connections,
+		Name:            query.Result.Name,
+		Description:     query.Result.Description,
+		Connections:     connections,
+		AutomaticSearch: query.Result.AutomaticSearch,
+		DefaultQuery:    query.Result.DefaultQuery,
 	}
 
 	return &view, nil
@@ -167,6 +174,44 @@ func (c *Views) UpdateDescription(name string, description string) error {
 	variables := map[string]interface{}{
 		"name":        graphql.String(name),
 		"description": graphql.String(description),
+	}
+
+	return c.client.Mutate(&mutation, variables)
+}
+
+func (c *Views) UpdateAutomaticSearch(name string, automaticSearch bool) error {
+	var mutation struct {
+		UpdateAutomaticSearch struct {
+			// We have to make a selection, so just take __typename
+			Typename graphql.String `graphql:"__typename"`
+		} `graphql:"setAutomaticSearching(name: $name, automaticSearch: $automaticSearch)"`
+	}
+
+	variables := map[string]interface{}{
+		"name":            graphql.String(name),
+		"automaticSearch": graphql.Boolean(automaticSearch),
+	}
+
+	return c.client.Mutate(&mutation, variables)
+}
+
+func (c *Views) UpdateDefaultSavedQuery(viewName, query string) error {
+	queryInfo, err := c.client.SavedQueries().Get(query, viewName)
+	if err != nil {
+		return fmt.Errorf("Unable to get saved query: %w", err)
+	}
+	queryId := queryInfo.SavedQueries[0].Id
+
+	var mutation struct {
+		SetDefaultSavedQuery struct {
+			// We have to make a selection, so just take __typename
+			Typename graphql.String `graphql:"__typename"`
+		} `graphql:"setDefaultSavedQuery(input: { savedQueryId: $savedQueryId, viewName: $viewName })"`
+	}
+
+	variables := map[string]interface{}{
+		"savedQueryId": graphql.String(queryId),
+		"viewName":     graphql.String(viewName),
 	}
 
 	return c.client.Mutate(&mutation, variables)

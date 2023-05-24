@@ -19,6 +19,8 @@ type Repository struct {
 	IngestRetentionSizeGB  float64 `graphql:"ingestSizeBasedRetention"`
 	StorageRetentionSizeGB float64 `graphql:"storageSizeBasedRetention"`
 	SpaceUsed              int64   `graphql:"compressedByteSize"`
+	AutomaticSearch        bool
+	DefaultQuery           SavedQuery
 }
 
 func (c *Client) Repositories() *Repositories { return &Repositories{client: c} }
@@ -247,6 +249,44 @@ func (r *Repositories) UpdateDescription(name, description string) error {
 	variables := map[string]interface{}{
 		"name":        graphql.String(name),
 		"description": graphql.String(description),
+	}
+
+	return r.client.Mutate(&mutation, variables)
+}
+
+func (r *Repositories) UpdateAutomaticSearch(name string, automaticSearch bool) error {
+	var mutation struct {
+		UpdateAutomaticSearch struct {
+			// We have to make a selection, so just take __typename
+			Typename graphql.String `graphql:"__typename"`
+		} `graphql:"setAutomaticSearching(name: $name, automaticSearch: $automaticSearch)"`
+	}
+
+	variables := map[string]interface{}{
+		"name":            graphql.String(name),
+		"automaticSearch": graphql.Boolean(automaticSearch),
+	}
+
+	return r.client.Mutate(&mutation, variables)
+}
+
+func (r *Repositories) UpdateDefaultSavedQuery(viewName, query string) error {
+	queryInfo, err := r.client.SavedQueries().Get(query, viewName)
+	if err != nil {
+		return fmt.Errorf("Unable to get saved query: %w", err)
+	}
+	queryId := queryInfo.SavedQueries[0].Id
+
+	var mutation struct {
+		SetDefaultSavedQuery struct {
+			// We have to make a selection, so just take __typename
+			Typename graphql.String `graphql:"__typename"`
+		} `graphql:"setDefaultSavedQuery(input: { savedQueryId: $savedQueryId, viewName: $viewName })"`
+	}
+
+	variables := map[string]interface{}{
+		"savedQueryId": graphql.String(queryId),
+		"viewName":     graphql.String(viewName),
 	}
 
 	return r.client.Mutate(&mutation, variables)
