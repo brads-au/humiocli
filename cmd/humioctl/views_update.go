@@ -16,6 +16,7 @@ package main
 
 import (
 	"fmt"
+	"strconv"
 
 	"github.com/spf13/cobra"
 )
@@ -23,6 +24,7 @@ import (
 func newViewsUpdateCmd() *cobra.Command {
 	connections := make(map[string]string)
 	description := ""
+	var automaticSearchFlag, defaultQueryFlag stringPtrFlag
 
 	cmd := cobra.Command{
 		Use:   "update [flags] <view>",
@@ -43,7 +45,7 @@ namely "repo1" and "repo2":
 			viewName := args[0]
 			client := NewApiClient(cmd)
 
-			if len(connections) == 0 && description == "" {
+			if len(connections) == 0 && description == "" && automaticSearchFlag.value == nil && defaultQueryFlag.value == nil {
 				exitOnError(cmd, fmt.Errorf("you must specify at least one flag"), "Nothing specified to update")
 			}
 
@@ -57,12 +59,33 @@ namely "repo1" and "repo2":
 				exitOnError(cmd, err, "Error updating view description")
 			}
 
+			if automaticSearchFlag.value != nil {
+				// Convert string to bool
+				automaticSearchBool, errBool := strconv.ParseBool(*automaticSearchFlag.value)
+				if errBool != nil {
+					exitOnError(cmd, errBool, "Error, unable to convert automatic search value to bool.")
+				}
+
+				err := client.Views().UpdateAutomaticSearch(viewName, automaticSearchBool)
+				exitOnError(cmd, err, "Error setting automatic search")
+			}
+			if defaultQueryFlag.value != nil {
+				query, sqErr := client.SavedQueries().Get(*defaultQueryFlag.value, viewName)
+				if sqErr != nil {
+					exitOnError(cmd, sqErr, "Error setting default saved query")
+				}
+				err := client.Views().UpdateDefaultSavedQuery(viewName, query.SavedQueries[0].Id)
+				exitOnError(cmd, err, "Error setting default saved query")
+			}
+
 			fmt.Fprintf(cmd.OutOrStdout(), "Successfully updated view %q\n", viewName)
 		},
 	}
 
 	cmd.Flags().StringToStringVar(&connections, "connection", connections, "Sets a repository connection with the chosen filter.")
 	cmd.Flags().StringVar(&description, "description", description, "Sets the view description.")
+	cmd.Flags().Var(&automaticSearchFlag, "automatic-search", "Set automatic search on loading the search page. true or false.")
+	cmd.Flags().Var(&defaultQueryFlag, "default-query", "Set the default saved query to be used on the search page.")
 
 	return &cmd
 }

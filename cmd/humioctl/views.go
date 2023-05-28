@@ -44,10 +44,12 @@ func printViewConnectionsTable(cmd *cobra.Command, view *api.View) {
 	for _, conn := range view.Connections {
 		rows = append(rows, []format.Value{
 			format.String(view.Name),
+			format.Bool(view.AutomaticSearch),
+			format.String(view.DefaultQuery.Name),
 			format.String(conn.RepoName),
 			format.String(conn.Filter),
 		})
 	}
 
-	printOverviewTable(cmd, []string{"View", "Repository", "Query Prefix"}, rows)
+	printOverviewTable(cmd, []string{"View", "Automatic Search", "Default Query", "Repository", "Query Prefix"}, rows)
 }
