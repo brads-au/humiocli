@@ -14,29 +14,22 @@ type Role struct {
 	ID                string   `graphql:"id"`
 	DisplayName       string   `graphql:"displayName"`
 	Color             string   `graphql:"color"`
-	Description       string   `graphql:"description`
+	Description       string   `graphql:"description"`
 	ViewPermissions   []string `graphql:"viewPermissions"`
-	SystemPermissions []string `graphql:"systemPermissions`
-	OrgPermissions    []string `graphql:"organizationPermissions`
+	SystemPermissions []string `graphql:"systemPermissions"`
+	OrgPermissions    []string `graphql:"organizationPermissions"`
 }
 
 func (c *Client) Roles() *Roles { return &Roles{client: c} }
 
 func (r *Roles) List() ([]Role, error) {
 	var query struct {
-		Roles struct {
-			Roles []Role
-		} `graphql:"roles()"`
+		Result []Role `graphql:"roles"`
 	}
 
 	err := r.client.Query(&query, nil)
 
-	var RolesList []Role
-	if err == nil {
-		RolesList = query.Roles.Roles
-	}
-
-	return RolesList, nil
+	return query.Result, err
 }
 
 func (r *Roles) Create(role *Role) error {
@@ -113,12 +106,12 @@ func (r *Roles) Update(rolename string, newRole *Role) error {
 	return r.client.Mutate(mutation, variables)
 }
 
-func (r *Roles) RemoveRole(rolename string) error {
+func (r *Roles) Remove(rolename string) error {
 	var mutation struct {
 		RemoveRole struct {
 			// We have to make a selection, so just take __typename
 			Typename graphql.String `graphql:"__typename"`
-		} `graphql:"removeRole(input: {roleId: $roleId})"`
+		} `graphql:"removeRole(roleId: $roleId)"`
 	}
 
 	role, err := r.client.Roles().Get(rolename)
@@ -130,7 +123,7 @@ func (r *Roles) RemoveRole(rolename string) error {
 		"roleId": graphql.String(role.ID),
 	}
 
-	return r.client.Mutate(mutation, variables)
+	return r.client.Mutate(&mutation, variables)
 }
 
 func (r *Roles) Get(rolename string) (*Role, error) {
@@ -140,19 +133,19 @@ func (r *Roles) Get(rolename string) (*Role, error) {
 	}
 
 	var query struct {
-		Role `graphql:"role(roleId: $roleId)"`
+		Result Role `graphql:"role(roleId: $roleId)"`
 	}
 
 	variables := map[string]interface{}{
 		"roleId": graphql.String(roleId),
 	}
 
-	err = r.client.Query(query, variables)
+	err = r.client.Query(&query, variables)
 	if err != nil {
 		return nil, err
 	}
 
-	return &query.Role, nil
+	return &query.Result, nil
 }
 
 func (r *Roles) GetRoleID(rolename string) (string, error) {
