@@ -16,13 +16,14 @@ package main
 
 import (
 	"fmt"
+	"strconv"
 
 	"github.com/spf13/cobra"
 )
 
 func newReposUpdateCmd() *cobra.Command {
 	var allowDataDeletionFlag bool
-	var descriptionFlag stringPtrFlag
+	var descriptionFlag, automaticSearchFlag, defaultQueryFlag stringPtrFlag
 	var retentionTimeFlag, ingestSizeBasedRetentionFlag, storageSizeBasedRetentionFlag float64PtrFlag
 
 	cmd := cobra.Command{
@@ -33,7 +34,7 @@ func newReposUpdateCmd() *cobra.Command {
 			repoName := args[0]
 			client := NewApiClient(cmd)
 
-			if descriptionFlag.value == nil && retentionTimeFlag.value == nil && ingestSizeBasedRetentionFlag.value == nil && storageSizeBasedRetentionFlag.value == nil {
+			if descriptionFlag.value == nil && retentionTimeFlag.value == nil && ingestSizeBasedRetentionFlag.value == nil && storageSizeBasedRetentionFlag.value == nil && automaticSearchFlag.value == nil && defaultQueryFlag.value == nil {
 				exitOnError(cmd, fmt.Errorf("you must specify at least one flag to update"), "Nothing specified to update")
 			}
 
@@ -53,6 +54,24 @@ func newReposUpdateCmd() *cobra.Command {
 				err := client.Repositories().UpdateStorageBasedRetention(repoName, *storageSizeBasedRetentionFlag.value, allowDataDeletionFlag)
 				exitOnError(cmd, err, "Error updating repository storage size based retention")
 			}
+			if automaticSearchFlag.value != nil {
+				// Convert string to bool
+				automaticSearchBool, errBool := strconv.ParseBool(*automaticSearchFlag.value)
+				if errBool != nil {
+					exitOnError(cmd, errBool, "Error, unable to convert automatic search value to bool.")
+				}
+
+				err := client.Repositories().UpdateAutomaticSearch(repoName, automaticSearchBool)
+				exitOnError(cmd, err, "Error setting automatic search")
+			}
+			if defaultQueryFlag.value != nil {
+				query, sqErr := client.SavedQueries().Get(*defaultQueryFlag.value, repoName)
+				if sqErr != nil {
+					exitOnError(cmd, sqErr, "Error setting default saved query")
+				}
+				err := client.Repositories().UpdateDefaultSavedQuery(repoName, query.SavedQueries[0].Id)
+				exitOnError(cmd, err, "Error setting default saved query")
+			}
 
 			fmt.Fprintf(cmd.OutOrStdout(), "Successfully updated repository %q\n", repoName)
 		},
@@ -63,6 +82,8 @@ func newReposUpdateCmd() *cobra.Command {
 	cmd.Flags().Var(&retentionTimeFlag, "retention-time", "The retention time in days for the repository.")
 	cmd.Flags().Var(&ingestSizeBasedRetentionFlag, "ingest-size-based-retention", "The ingest size based retention for the repository.")
 	cmd.Flags().Var(&storageSizeBasedRetentionFlag, "storage-size-based-retention", "The storage size based retention for the repository.")
+	cmd.Flags().Var(&automaticSearchFlag, "automatic-search", "Set automatic search on loading the search page. true or false.")
+	cmd.Flags().Var(&defaultQueryFlag, "default-query", "Set the default saved query to be used on the search page.")
 
 	return &cmd
 }
