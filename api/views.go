@@ -74,7 +74,9 @@ func (c *Views) Get(name string) (*View, error) {
 }
 
 type ViewListItem struct {
-	Name string
+	Name            string
+	AutomaticSearch bool
+	DefaultQuery    SavedQuery
 }
 
 func (c *Views) List() ([]ViewListItem, error) {

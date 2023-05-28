@@ -1,0 +1,38 @@
+users:
+  - username: test-a
+    email: a@testcompany.com
+    searchDomains:
+      - name: ^humio.*$
+        regex: true
+        role: Member
+  - username: test-b
+    email: b@testcompany.com
+    searchDomains:
+      - name: ^.*test$
+        regex: true
+        role: Admin
+      - name: humio
+        role: Member
+  - username: user-x
+    email: x@user.com
+  - username: user-y
+    email: y@user.com
+
+repos:
+  - name: ztest
+    automaticSearch: false
+    defaultQuery: default-empty-5m-rawstring
+  - name: ytest
+    automaticSearch: true
+    defaultQuery: default-empty-5m-rawstring
+
+views:
+  - name: atest
+    automaticSearch: false
+    defaultQuery: default-empty-5m-rawstring
+
+defaultQueries:
+  - name: default-empty-5m-rawstring
+    global: true
+    queryString: ""
+    start: "5m"

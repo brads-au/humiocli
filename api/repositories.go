@@ -45,9 +45,11 @@ func (r *Repositories) Get(name string) (Repository, error) {
 }
 
 type RepoListItem struct {
-	ID        string
-	Name      string
-	SpaceUsed int64 `graphql:"compressedByteSize"`
+	ID              string
+	Name            string
+	SpaceUsed       int64 `graphql:"compressedByteSize"`
+	AutomaticSearch bool
+	DefaultQuery    SavedQuery
 }
 
 func (r *Repositories) List() ([]RepoListItem, error) {
