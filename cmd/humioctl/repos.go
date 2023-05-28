@@ -45,6 +45,8 @@ func printRepoDetailsTable(cmd *cobra.Command, repo api.Repository) {
 		{format.String("Ingest Retention (Size)"), ByteCountDecimal(repo.IngestRetentionSizeGB * 1e9)},
 		{format.String("Storage Retention (Size)"), ByteCountDecimal(repo.StorageRetentionSizeGB * 1e9)},
 		{format.String("Retention (Days)"), format.Int(repo.RetentionDays)},
+		{format.String("Automatic Search"), format.Bool(repo.AutomaticSearch)},
+		{format.String("Default Query"), format.String(repo.DefaultQuery.Name)},
 	}
 
 	printDetailsTable(cmd, details)
