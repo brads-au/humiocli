@@ -7,6 +7,9 @@ import (
 	"github.com/humio/cli/api"
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v2"
+
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 )
 
 func newApplyCmd() *cobra.Command {
@@ -14,6 +17,8 @@ func newApplyCmd() *cobra.Command {
 	var dryRun, verbose bool
 	var err error
 	var content []byte
+
+	zerolog.TimeFieldFormat = zerolog.TimeFormatUnix
 
 	cmd := cobra.Command{
 		Use:   "apply",
@@ -47,12 +52,12 @@ func newApplyCmd() *cobra.Command {
 
 					// Create user if it doesn't exist
 					if rUser.ID == "" {
-						cmd.Printf("[Users] Creating: %s\n", user.Username)
+						log.Info().Msgf("User creating: %s", user.Username)
 
 						_, err := client.Users().Add(user.Username, api.UserChangeSet{})
 						exitOnError(cmd, err, "Error creating the user")
 					} else {
-						cmd.Printf("[Users] Exists: %s\n", rUser.Username)
+						log.Info().Msgf("User exists: %s", user.Username)
 					}
 
 					// Reconcile user permissions
@@ -76,12 +81,14 @@ func newApplyCmd() *cobra.Command {
 							for _, result := range listSearchDomains {
 								role, err := client.Roles().Get(searchDomain.Role)
 								if err != nil {
-									exitOnError(cmd, err, "Error getting role ID")
+									log.Error().Err(err).Msgf("Error getting role id for user: %s", user.Username)
+									continue
 								}
 
 								sd, err := client.SearchDomains().Get(result)
 								if err != nil {
-									exitOnError(cmd, err, "Error getting search domain ID")
+									log.Error().Err(err).Msgf("Error getting search domain id for user: %s", user.Username)
+									continue
 								}
 
 								// FIXME: Getting user ID, could I pick this up from above though
@@ -89,10 +96,11 @@ func newApplyCmd() *cobra.Command {
 
 								errSD := client.SearchDomains().UpdateUserPermissions(sd.Id, user.ID, role.ID)
 								if errSD != nil {
-									exitOnError(cmd, err, "Error updating user permissions")
+									log.Error().Err(err).Msgf("Error setting permissions for user: %s", user.Username)
+									continue
 								}
 
-								cmd.Printf("[Users] Updated: %s on %s as %s\n", user.Username, sd.Name, role.DisplayName)
+								log.Info().Msgf("User updated: %s on %s as %s", user.Username, sd.Name, role.DisplayName)
 							}
 						}
 					}
@@ -108,11 +116,14 @@ func newApplyCmd() *cobra.Command {
 						for _, searchDomain := range searchDomains {
 							savedQuery, _ := client.SavedQueries().Get(defaultQuery.Name, searchDomain.Name)
 							if savedQuery == nil {
-								cmd.Printf("[Queries] Creating query: %s in %s\n", defaultQuery.Name, searchDomain.Name)
+								log.Info().Msgf("Query missing, creating: %s in %s", defaultQuery.Name, searchDomain.Name)
 								err := client.SavedQueries().Create(defaultQuery.Name, searchDomain.Name, defaultQuery.QueryString, defaultQuery.Start, "now", false, "list-view")
-								exitOnError(cmd, err, "Unable to create saved query")
+								if err != nil {
+									log.Error().Err(err).Msgf("Error creating query: %s in %s", defaultQuery.Name, searchDomain.Name)
+									continue
+								}
 							} else {
-								cmd.Printf("[Queries] Exists: %s in %s\n", defaultQuery.Name, searchDomain.Name)
+								log.Info().Msgf("Query exists: %s in %s", defaultQuery.Name, searchDomain.Name)
 							}
 						}
 					} else {
@@ -124,7 +135,8 @@ func newApplyCmd() *cobra.Command {
 			// Repos
 			listRepos, err := client.Repositories().List()
 			if err != nil {
-				cmd.Printf("ERROR listing repositories: %s", err)
+				log.Fatal().Err(err).Msg("Error listing repositories")
+				exitOnError(cmd, err, "Error listing repositories")
 			}
 
 			for _, repo := range config.Repos {
@@ -133,18 +145,24 @@ func newApplyCmd() *cobra.Command {
 						match, _ := regexp.MatchString(repo.Name, rangeRepos.Name)
 
 						if match {
-							cmd.Printf("[Repos] Exists: %s\n", rangeRepos.Name)
+							log.Info().Msgf("Repo exists: %s", rangeRepos.Name)
 
 							if repo.AutomaticSearch != rangeRepos.AutomaticSearch {
-								cmd.Printf("[Repos] Updating Automatic Search: %s\n", rangeRepos.Name)
+								log.Info().Msgf("Repo updating automatic search: %s", rangeRepos.Name)
 								err := client.Repositories().UpdateAutomaticSearch(rangeRepos.Name, repo.AutomaticSearch)
-								exitOnError(cmd, err, "Error setting automatic search")
+								if err != nil {
+									log.Error().Err(err).Msgf("Error setting automatic search: %s", rangeRepos.Name)
+									continue
+								}
 							}
 
 							if repo.DefaultQuery != rangeRepos.DefaultQuery.Name {
-								cmd.Printf("[Repos] Updating Default Query: %s\n", rangeRepos.Name)
+								log.Info().Msgf("Repo updating default query: %s", rangeRepos.Name)
 								err := client.Repositories().UpdateDefaultSavedQuery(rangeRepos.Name, repo.DefaultQuery)
-								exitOnError(cmd, err, "Error setting default saved query")
+								if err != nil {
+									log.Error().Err(err).Msgf("Error setting default saved query: %s", rangeRepos.Name)
+									continue
+								}
 							}
 						}
 					}
@@ -153,20 +171,27 @@ func newApplyCmd() *cobra.Command {
 						result, _ := client.Repositories().Get(repo.Name)
 
 						if result.ID == "" {
-							cmd.Printf("[Repos] Creating (not yet implemented): %s\n", repo.Name)
+							log.Info().Msgf("Repo missing, creating (not yet implemented): %s", repo.Name)
+							continue
 						} else {
-							cmd.Printf("[Repos] Exists: %s\n", result.Name)
+							log.Info().Msgf("Repo exists: %s", result.Name)
 
 							if repo.AutomaticSearch != result.AutomaticSearch {
-								cmd.Printf("[Repos] Updating Automatic Search: %s\n", result.Name)
+								log.Info().Msgf("Repo updating automatic search: %s", result.Name)
 								err := client.Repositories().UpdateAutomaticSearch(repo.Name, repo.AutomaticSearch)
-								exitOnError(cmd, err, "Error setting automatic search")
+								if err != nil {
+									log.Error().Err(err).Msgf("Error setting automatic search: %s", result.Name)
+									continue
+								}
 							}
 
 							if repo.DefaultQuery != result.DefaultQuery.Name {
-								cmd.Printf("[Repos] Updating Default Query: %s\n", result.Name)
+								log.Info().Msgf("Repo updating default query: %s", result.Name)
 								err := client.Repositories().UpdateDefaultSavedQuery(repo.Name, repo.DefaultQuery)
-								exitOnError(cmd, err, "Error setting default saved query")
+								if err != nil {
+									log.Error().Err(err).Msgf("Error setting default saved query: %s", result.Name)
+									continue
+								}
 							}
 						}
 					}
@@ -176,7 +201,8 @@ func newApplyCmd() *cobra.Command {
 			// Views
 			listViews, err := client.Views().List()
 			if err != nil {
-				cmd.Printf("ERROR listing views: %s", err)
+				log.Fatal().Err(err).Msg("Error listing views")
+				exitOnError(cmd, err, "Error listing views")
 			}
 
 			for _, view := range config.Views {
@@ -185,18 +211,24 @@ func newApplyCmd() *cobra.Command {
 						match, _ := regexp.MatchString(view.Name, rangeViews.Name)
 
 						if match {
-							cmd.Printf("[Views] Exists: %s\n", rangeViews.Name)
+							log.Info().Msgf("View exists: %s", rangeViews.Name)
 
 							if view.AutomaticSearch != rangeViews.AutomaticSearch {
-								cmd.Printf("[Views] Updating Automatic Search: %s\n", rangeViews.Name)
+								log.Info().Msgf("View updating automatic search: %s", rangeViews.Name)
 								err := client.Views().UpdateAutomaticSearch(rangeViews.Name, view.AutomaticSearch)
-								exitOnError(cmd, err, "Error setting automatic search")
+								if err != nil {
+									log.Error().Err(err).Msgf("Error setting automatic search: %s", rangeViews.Name)
+									continue
+								}
 							}
 
 							if view.DefaultQuery != rangeViews.DefaultQuery.Name {
-								cmd.Printf("[Views] Updating Default Query: %s\n", rangeViews.Name)
+								log.Info().Msgf("View updating default query: %s", rangeViews.Name)
 								err := client.Views().UpdateDefaultSavedQuery(rangeViews.Name, view.DefaultQuery)
-								exitOnError(cmd, err, "Error setting default saved query")
+								if err != nil {
+									log.Error().Err(err).Msgf("Error setting default saved query: %s", rangeViews.Name)
+									continue
+								}
 							}
 						}
 					}
@@ -204,25 +236,32 @@ func newApplyCmd() *cobra.Command {
 					if view.Name != "" {
 						result, err1 := client.Views().Get(view.Name)
 						if err1 != nil {
-							cmd.Printf("[Views] Missing (not yet implemented): %s\n", view.Name)
+							log.Info().Msgf("View missing, creating (not yet implemented): %s", view.Name)
 							continue
 						}
 
 						if result.Name == "" {
-							cmd.Printf("[Views] Creating (not yet implemented): %s\n", view.Name)
+							log.Info().Msgf("View missing, creating (not yet implemented): %s", view.Name)
+							continue
 						} else {
-							cmd.Printf("[Views] Exists: %s\n", result.Name)
+							log.Info().Msgf("View exists: %s", result.Name)
 
 							if view.AutomaticSearch != result.AutomaticSearch {
-								cmd.Printf("[Views] Updating Automatic Search: %s\n", result.Name)
+								log.Info().Msgf("View updating automatic search: %s", result.Name)
 								err := client.Views().UpdateAutomaticSearch(view.Name, view.AutomaticSearch)
-								exitOnError(cmd, err, "Error setting automatic search")
+								if err != nil {
+									log.Error().Err(err).Msgf("Error setting automatic search: %s", result.Name)
+									continue
+								}
 							}
 
 							if view.DefaultQuery != result.DefaultQuery.Name {
-								cmd.Printf("[Views] Updating Default Query: %s\n", result.Name)
+								log.Info().Msgf("View updating default query: %s", result.Name)
 								err := client.Views().UpdateDefaultSavedQuery(view.Name, view.DefaultQuery)
-								exitOnError(cmd, err, "Error setting default saved query")
+								if err != nil {
+									log.Error().Err(err).Msgf("Error setting default saved query: %s", result.Name)
+									continue
+								}
 							}
 						}
 					}
