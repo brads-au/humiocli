@@ -4,8 +4,6 @@ import (
 	"fmt"
 	"sort"
 	"strings"
-
-	"github.com/shurcooL/graphql"
 )
 
 type Views struct {
@@ -46,7 +44,7 @@ func (c *Views) Get(name string) (*View, error) {
 	}
 
 	variables := map[string]interface{}{
-		"name": graphql.String(name),
+		"name": name,
 	}
 
 	err := c.client.Query(&query, variables)
@@ -92,8 +90,8 @@ func (c *Views) List() ([]ViewListItem, error) {
 }
 
 type ViewConnectionInput struct {
-	RepositoryName graphql.String `json:"repositoryName"`
-	Filter         graphql.String `json:"filter"`
+	RepositoryName string `json:"repositoryName"`
+	Filter         string `json:"filter"`
 }
 
 func (c *Views) Create(name, description string, connections map[string]string) error {
@@ -109,14 +107,14 @@ func (c *Views) Create(name, description string, connections map[string]string) 
 		viewConnections = append(
 			viewConnections,
 			ViewConnectionInput{
-				RepositoryName: graphql.String(k),
-				Filter:         graphql.String(v),
+				RepositoryName: k,
+				Filter:         v,
 			})
 	}
 
 	variables := map[string]interface{}{
-		"name":        graphql.String(name),
-		"description": graphql.String(description),
+		"name":        name,
+		"description": description,
 		"connections": viewConnections,
 	}
 
@@ -127,12 +125,12 @@ func (c *Views) Delete(name, reason string) error {
 	var mutation struct {
 		DeleteSearchDomain struct {
 			// We have to make a selection, so just take __typename
-			Typename graphql.String `graphql:"__typename"`
+			Typename string `graphql:"__typename"`
 		} `graphql:"deleteSearchDomain(name: $name, deleteMessage: $reason)"`
 	}
 	variables := map[string]interface{}{
-		"name":   graphql.String(name),
-		"reason": graphql.String(reason),
+		"name":   name,
+		"reason": reason,
 	}
 
 	return c.client.Mutate(&mutation, variables)
@@ -150,13 +148,13 @@ func (c *Views) UpdateConnections(name string, connections map[string]string) er
 		viewConnections = append(
 			viewConnections,
 			ViewConnectionInput{
-				RepositoryName: graphql.String(k),
-				Filter:         graphql.String(v),
+				RepositoryName: k,
+				Filter:         v,
 			})
 	}
 
 	variables := map[string]interface{}{
-		"viewName":    graphql.String(name),
+		"viewName":    name,
 		"connections": viewConnections,
 	}
 
@@ -167,13 +165,13 @@ func (c *Views) UpdateDescription(name string, description string) error {
 	var mutation struct {
 		UpdateDescriptionMutation struct {
 			// We have to make a selection, so just take __typename
-			Typename graphql.String `graphql:"__typename"`
+			Typename string `graphql:"__typename"`
 		} `graphql:"updateDescriptionForSearchDomain(name: $name, newDescription: $description)"`
 	}
 
 	variables := map[string]interface{}{
-		"name":        graphql.String(name),
-		"description": graphql.String(description),
+		"name":        name,
+		"description": description,
 	}
 
 	return c.client.Mutate(&mutation, variables)
