@@ -1,9 +1,5 @@
 package api
 
-import (
-	"github.com/shurcooL/graphql"
-)
-
 type SearchDomains struct {
 	client *Client
 }
@@ -29,7 +25,7 @@ func (s *SearchDomains) Get(name string) (SearchDomain, error) {
 	}
 
 	variables := map[string]interface{}{
-		"name": graphql.String(name),
+		"name": string(name),
 	}
 
 	err := s.client.Query(&query, variables)
