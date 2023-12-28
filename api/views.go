@@ -1,6 +1,7 @@
 package api
 
 import (
+	"fmt"
 	"sort"
 	"strings"
 
@@ -67,6 +68,7 @@ func (c *Views) Get(name string) (*View, error) {
 }
 
 type ViewListItem struct {
+	Id       string
 	Name     string
 	Typename string `graphql:"__typename"`
 }
@@ -171,4 +173,21 @@ func (c *Views) UpdateDescription(name string, description string) error {
 	}
 
 	return c.client.Mutate(&mutation, variables)
+}
+
+func (c *Views) GetViewID(name string) (string, error) {
+	views, err := c.List()
+	if err != nil {
+		return "", fmt.Errorf("unable to get view ID: %w", err)
+	}
+
+	var viewId string
+	for _, view := range views {
+		if view.Name == name || view.Id == name {
+			viewId = view.Id
+			break
+		}
+	}
+
+	return viewId, nil
 }
